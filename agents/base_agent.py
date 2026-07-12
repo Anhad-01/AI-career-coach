@@ -15,16 +15,21 @@ from abc import ABC, abstractmethod  #abstract base class
 from services.gemini_service import GeminiService
 from memory.shared_memory import SharedMemory
 from models.agent_response import AgentResponse
+from memory.conversation_memory import ConversationMemory
 
 class BaseAgent(ABC):
     '''
     Abstract Base Class for all AI Agents
     '''
 
-    def __init__(self, memory: SharedMemory, gemini_service: GeminiService):
-        super().__init__()
+    def __init__(self,
+                 memory: SharedMemory,
+                 gemini_service: GeminiService,
+                 conversation_memory: ConversationMemory):
+        super().__init__() #initializing variables
         self.memory = memory
         self.gemini = gemini_service
+        self.conversation_memory = conversation_memory
 
     @abstractmethod
     def get_agent_name(self) -> str:
@@ -53,13 +58,28 @@ class BaseAgent(ABC):
         Execute the complete AI agent workflow
         Build prompt -> Call Gemini -> Create agent response -> Store in shared memory -> Return response
         '''
-        prompt = self.build_prompt()
+        agent_prompt = self.build_prompt()
+        conversation = self.conversation_memory.get_context()
+
+        prompt = f"""
+        Conversation History:
+        --------------------------
+        {conversation}
+
+        Current Task:
+        --------------------------
+        {agent_prompt}
+        """
+
         gemini_response = self.gemini.generate_response(prompt)
+        self.conversation_memory.add_ai_message(gemini_response.text)
+
         agent_response = AgentResponse(
             agent_name = self.get_agent_name(),
             output = gemini_response.text,
             status = "SUCCESS"
         )
+
         self.memory.add(
             self.get_memory_key(),
             agent_response

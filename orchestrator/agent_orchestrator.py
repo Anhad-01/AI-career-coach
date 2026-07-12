@@ -12,9 +12,10 @@ class AgentOrchestrator:
     Executes AI agents in sequence
     '''
 
-    def __init__(self, memory: SharedMemory):
+    def __init__(self, memory: SharedMemory, conversation_memory):
         self.memory = memory
         self.agents: List[BaseAgent] = []
+        self.conversation_memory = conversation_memory
 
     def register(self, agent: BaseAgent) -> None:
         '''
