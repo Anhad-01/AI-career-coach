@@ -1,0 +1,26 @@
+{
+    "ai_engineer":{
+        "skills":[
+            "Python", "Machine Learning", "Deep Learning", "Gen AI", "Agentic AI", "RAG", "MCP"
+        ],
+        "certifications":[
+            "AI-101", "Google-GenAI"
+        ],
+        "projects":[
+            "AI Chatbot Development", "Image Recognition System", "Recommendation Engine"
+
+        ]
+    },
+
+    "data_scientist":{
+        "skills":[
+            "Python", "Machine Learning", "Deep Learning", "Statistics", "Data Visualization"
+        ],
+        "certifications":[
+            "DP-10"
+        ],
+        "projects":[
+            "Predictive Analytics Model", "Customer Segmentation Analysis", "Time Series Forecasting"
+        ]
+    }
+}
