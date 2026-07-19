@@ -1,12 +1,21 @@
 '''
 Agent Orchestrator
 Responsible for managing the execution of AI Agents
+
+Responsibilities
+1. Register AI Agents
+2. Execute selected workflow
+3. Retry failed agents
+4. Track execution details
+5. Return final response
 '''
 
 from typing import List, Dict
 from agents.base_agent import BaseAgent
 from memory.shared_memory import SharedMemory
 from models.agent_response import AgentResponse
+from models.agent_execution_results import AgentExecutionResult
+import time
 
 class AgentOrchestrator:
     '''
@@ -20,6 +29,7 @@ class AgentOrchestrator:
         self.agents: List[BaseAgent] = []
         self.conversation_memory = conversation_memory
         self._agents: Dict[str, BaseAgent] = {}
+        self._execution_results: List[AgentExecutionResult] = []
 
     def register(self, agent: BaseAgent) -> None:
         '''
@@ -53,6 +63,8 @@ class AgentOrchestrator:
 
         print("\nStarting Multi-Agent Workflow...\n")
 
+        self._execution_results.clear()
+
         final_response = None
         for step, agent_name in enumerate(workflow, start=1):
             agent = self._agents.get(agent_name.lower())
@@ -77,19 +89,69 @@ class AgentOrchestrator:
             AgentResponse
         '''
 
+        start_time = time.perf_counter()
+        last_exception = None
+
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
                 print(f"Attempt: {attempt}")
                 response = agent.execute()
+
+                execution_time = time.perf_counter() - start_time
+                self._execution_results.append(
+                    AgentExecutionResult(
+                        agent_name=agent.get_agent_name(),
+                        status="SUCCESS",
+                        attempts=attempt,
+                        execution_time=execution_time
+                    )
+                )
+
                 print("Success")
                 return response
             except Exception as ex:
                 print(f"Attempt {attempt} failed...")
-                print(ex)
 
-                if attempt == self.MAX_RETRIES:
-                    raise RuntimeError(
-                        f"{agent.get_agent_name()} failed after {self.MAX_RETRIES} attempts"
-                    )
-                
-                print ("Retrying...")
+                # if attempt == self.MAX_RETRIES:
+                #     raise RuntimeError(
+                #         f"{agent.get_agent_name()} failed after {self.MAX_RETRIES} attempts"
+                #     )
+                if attempt < self.MAX_RETRIES:
+                    print("Retrying...")
+
+        execution_time = (
+            time.perf_counter() - start_time
+        )
+        self._execution_results.append(
+            AgentExecutionResult(
+                agent_name=agent.get_agent_name(),
+                status="FAILED",
+                attempts=self.MAX_RETRIES,
+                execution_time=execution_time,
+                error_message=str(last_exception)
+            )
+        )
+
+        raise RuntimeError(
+            f"{agent.get_agent_name()} failed after {self.MAX_RETRIES} attempts"
+        ) from last_exception
+    
+    def get_execution_results(self) -> List[AgentExecutionResult]:
+        '''
+        Return execution summary
+        '''
+        return self._execution_results
+    
+    def display_execution_summary(self) -> None:
+        '''
+        Display execution summary
+        '''
+        print("=" * 70)
+        print("AGENT EXECUTION SUMMARY")
+        print("=" * 70)
+
+        for result in self._execution_results:
+            result.display()
+            print("-" * 70)
+        
+        print("=" * 70)
