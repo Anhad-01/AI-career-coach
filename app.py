@@ -7,6 +7,8 @@ from agents.planner_agent import PlannerAgent
 from agents.research_agent import ResearchAgent
 from agents.writer_agent import WriterAgent
 from agents.reviewer_agent import ReviewerAgent
+from agents.project_agent import ProjectAgent
+from agents.certification_agent import CertificationAgent
 
 from orchestrator.agent_orchestrator import AgentOrchestrator
 
@@ -48,12 +50,17 @@ def main() -> None:
         researcher = ResearchAgent(memory, gemini_service, conversation_memory, knowledge_base)
         writer = WriterAgent(memory, gemini_service, conversation_memory, knowledge_base)
         reviewer = ReviewerAgent(memory, gemini_service, conversation_memory, knowledge_base)
+        project = ProjectAgent(memory, gemini_service, conversation_memory, knowledge_base)
+        certification = CertificationAgent(memory, gemini_service, conversation_memory, knowledge_base)
+        
 
         orchestrator = AgentOrchestrator(memory, conversation_memory)
         orchestrator.register(planner)
         orchestrator.register(researcher)
         orchestrator.register(writer)
         orchestrator.register(reviewer)
+        orchestrator.register(project)
+        orchestrator.register(certification)
 
         # Route the user query
         decision = workflow_router.route(user_query)
@@ -62,8 +69,17 @@ def main() -> None:
         #retrieve the workflow
         workflow = workflow_registry.get_workflow(decision.workflow_name)
 
-        for index, agent in enumerate(workflow, start=1):
-            print(f"Step {index}: {agent.title()}")
+        for index, agents in enumerate(workflow, start=1):
+            # print(f"Step {index}: {agent.title()}")
+            if isinstance(agents, list):
+                parallel_agents = ", ".join(
+                    agent.title() for agent in agents
+                )
+
+                print(f"{index}. Parallel Stage -> [{parallel_agents}]")
+
+            else:
+                print(f"{index}. {agents.title()} Agent")
 
         
         final_response = orchestrator.execute(workflow) 

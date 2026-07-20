@@ -15,6 +15,7 @@ from agents.base_agent import BaseAgent
 from memory.shared_memory import SharedMemory
 from models.agent_response import AgentResponse
 from models.agent_execution_results import AgentExecutionResult
+from concurrent.futures import ThreadPoolExecutor
 import time
 
 class AgentOrchestrator:
@@ -70,33 +71,43 @@ class AgentOrchestrator:
 
         final_response = None
         for step, agent_name in enumerate(workflow, start=1):
-            agent = self._agents.get(agent_name.lower())
-            if agent is None:
-                raise ValueError(f"Agent {agent_name} is not registered")
-            
-            print(f"\nStep {step}: Executing {agent.get_agent_name()} Agent...")
 
-            # Human approval check
-            if agent_name.lower() in self._approval_required_agents:
-                approved = self._request_human_approval(agent)
-                if not approved:
-                    print(f"{agent.get_agent_name()} execution cancelled.")
+            # Parallel Execution Stage
+            if isinstance(agent_name, list):
+                parallel_response = self._execute_parallel(agent_name)
+                if parallel_response:
+                    # Store the last response
+                    final_response = parallel_response[-1]
 
-                    self._execution_results.append(
-                    AgentExecutionResult(
-                        agent_name=agent.get_agent_name(),
-                        status="SKIPPED",
-                        attempts=0,
-                        execution_time=0.0,
-                        error_message="Execution rejected by user."
+            # Sequential Agent Execution
+            else:
+                agent = self._agents.get(agent_name.lower())
+                if agent is None:
+                    raise ValueError(f"Agent {agent_name} is not registered")
+                
+                print(f"\nStep {step}: Executing {agent.get_agent_name()} Agent...")
+
+                # Human approval check
+                if agent_name.lower() in self._approval_required_agents:
+                    approved = self._request_human_approval(agent)
+                    if not approved:
+                        print(f"{agent.get_agent_name()} execution cancelled.")
+
+                        self._execution_results.append(
+                        AgentExecutionResult(
+                            agent_name=agent.get_agent_name(),
+                            status="SKIPPED",
+                            attempts=0,
+                            execution_time=0.0,
+                            error_message="Execution rejected by user."
+                        )
                     )
-                )
-                print("\nWorkflow terminated by user.")
-                break
+                    print("\nWorkflow terminated by user.")
+                    break
 
-            # final_response = agent.execute()
-            final_response = self._execute_with_retry(agent)
-            print(f"{agent.get_agent_name()} completed successfully...")
+                # final_response = agent.execute()
+                final_response = self._execute_with_retry(agent)
+                print(f"{agent.get_agent_name()} completed successfully...")
 
         print("\nWorkflow completed.")
         return final_response
@@ -180,6 +191,25 @@ class AgentOrchestrator:
                 return False
 
             print("Invalid input. Please enter Y or N.")
+
+    def _execute_parallel(self, agent_names: List[str]):
+        print("\nExecuting Parallel Agents...\n")
+
+        with ThreadPoolExecutor(
+            max_workers=len(agent_names)
+        ) as executor:
+            futures = []
+            for agent_name in agent_names:
+                agent = self._agents[agent_name.lower()]
+                futures.append(
+                    executor.submit(self._execute_with_retry, agent)
+                )
+            
+            responses = []
+            for future in futures:
+                responses.append(future.result())
+
+        return responses
 
     def get_execution_results(self) -> List[AgentExecutionResult]:
         '''
